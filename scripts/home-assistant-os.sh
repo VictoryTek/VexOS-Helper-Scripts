@@ -77,15 +77,26 @@ fi
 # encodes the actual PVE release (e.g. proxmox-ve-9.2.10) — so this must
 # NOT be inferred from wherever qm happens to resolve to. pvedaemon is
 # reliably part of that main meta-package, so use it specifically.
-PVE_VERSION_DIR=""
-if command -v systemctl &>/dev/null; then
-  PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
-  if [[ -n "$PVE_EXEC" ]]; then
-    PVE_VERSION_DIR=$(dirname "$(readlink -f "$PVE_EXEC")")
+#
+# This is deliberately computed only once, here, on the first pass through
+# the script (before any nix-shell re-exec) and threaded through via
+# HAOS_PVE_VERSION_DIR below — re-detecting it a second time from inside
+# nix-shell's constrained environment (different PATH, possibly no
+# systemctl) is exactly the kind of thing that behaves differently there
+# for reasons that are annoying to chase down.
+if [[ -n "${HAOS_PVE_VERSION_DIR:-}" ]]; then
+  PVE_VERSION_DIR="$HAOS_PVE_VERSION_DIR"
+else
+  PVE_VERSION_DIR=""
+  if command -v systemctl &>/dev/null; then
+    PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
+    if [[ -n "$PVE_EXEC" ]]; then
+      PVE_VERSION_DIR=$(dirname "$(readlink -f "$PVE_EXEC")")
+    fi
   fi
-fi
-if [[ -z "$PVE_VERSION_DIR" ]]; then
-  PVE_VERSION_DIR=$(find /nix/store -maxdepth 1 -type d -name 'proxmox-ve-*' 2>/dev/null | sort -V | tail -n1)
+  if [[ -z "$PVE_VERSION_DIR" ]]; then
+    PVE_VERSION_DIR=$(find /nix/store -maxdepth 1 -type d -name 'proxmox-ve-*' 2>/dev/null | sort -V | tail -n1)
+  fi
 fi
 
 # nix-shell replaces PATH with just its build environment rather than
@@ -129,7 +140,7 @@ if [[ -z "${NIX_SHELL_REEXEC:-}" ]]; then
     # --run just hands that string to a shell to parse, so anything odd
     # in a directory name (quotes, $, etc.) could break the interpolated
     # version silently. `env` sidesteps that entirely.
-    exec env NIX_SHELL_REEXEC=1 HAOS_ORIG_PATH="$ORIG_PATH" \
+    exec env NIX_SHELL_REEXEC=1 HAOS_ORIG_PATH="$ORIG_PATH" HAOS_PVE_VERSION_DIR="$PVE_VERSION_DIR" \
       nix-shell -p "${missing_pkgs[@]}" --run "bash '$SELF_PATH'"
   fi
 fi
