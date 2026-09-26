@@ -33,6 +33,12 @@
 #    something this script can paper over — it'll tell you which one.
 # ---------------------------------------------------------------------------
 
+# nix-shell replaces PATH with just its build environment rather than
+# appending to the existing one, so Proxmox's own binaries (pveversion, qm,
+# etc. — not part of nixpkgs) would otherwise vanish once we re-exec into
+# it. Capture the current PATH now so it can be stitched back in below.
+ORIG_PATH="$PATH"
+
 # --- Preflight: pull in tools NixOS doesn't ship by default -----------------
 # Map: command name -> nixpkgs package that provides it
 declare -A NIX_PKG_FOR=(
@@ -63,7 +69,7 @@ if [[ -z "${NIX_SHELL_REEXEC:-}" ]]; then
       SELF_PATH=$(mktemp)
       curl -fsSL "$SCRIPT_URL" -o "$SELF_PATH"
     fi
-    exec nix-shell -p "${missing_pkgs[@]}" --run "NIX_SHELL_REEXEC=1 bash '$SELF_PATH'"
+    exec nix-shell -p "${missing_pkgs[@]}" --run "NIX_SHELL_REEXEC=1 PATH=\"\$PATH:$ORIG_PATH\" bash '$SELF_PATH'"
   fi
 fi
 
