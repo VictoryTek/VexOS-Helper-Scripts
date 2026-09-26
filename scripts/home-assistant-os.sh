@@ -71,8 +71,10 @@ if ! command -v qm &>/dev/null; then
 else
   # qm was already reachable; still record where, so pve_check() below can
   # read the version out of the store path name instead of calling
-  # pveversion (which doesn't exist in this build).
-  PVE_BIN_DIR=$(dirname "$(command -v qm)")
+  # pveversion (which doesn't exist in this build). command -v may return
+  # a symlink (e.g. /run/current-system/sw/bin/qm) rather than the real
+  # store path, so resolve it fully first.
+  PVE_BIN_DIR=$(dirname "$(readlink -f "$(command -v qm)")")
 fi
 
 # nix-shell replaces PATH with just its build environment rather than
