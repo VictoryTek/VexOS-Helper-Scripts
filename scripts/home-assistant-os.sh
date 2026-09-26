@@ -26,26 +26,35 @@
 #    re-execs itself inside `nix-shell -p ...` to pull them in temporarily,
 #    rather than trying (and failing) to apt-get them.
 #
-# 5. Everything that talks to Proxmox itself — qm, pvesm, pvesh, pveversion,
-#    lvs — is left as-is. proxmox-nixos packages real Proxmox VE, so these
-#    should behave the same as on Debian-based Proxmox. If any of those are
+# 5. Everything that talks to Proxmox itself — qm, pvesm, pvesh, lvs — is
+#    left as-is. proxmox-nixos packages real Proxmox VE, so these should
+#    behave the same as on Debian-based Proxmox. If any of those are
 #    missing on your system, that's a proxmox-nixos config gap, not
 #    something this script can paper over — it'll tell you which one.
+#    Note: pveversion specifically is NOT required — some proxmox-nixos
+#    builds don't ship it at all (confirmed via `ls` on the proxmox-ve
+#    package's bin/ dir). Where the original script used it for version
+#    detection, this one falls back to parsing the version out of the
+#    Nix store path name instead (e.g. proxmox-ve-9.2.10 -> 9.2.10).
 # ---------------------------------------------------------------------------
 
 # proxmox-nixos runs Proxmox VE's actual binaries straight out of the Nix
 # store (systemd units call them by full path) but doesn't necessarily
 # symlink that output into /run/current-system/sw/bin the way
-# environment.systemPackages normally would — so pveversion/qm/etc. can be
+# environment.systemPackages normally would — so qm/pvesh/pvesm can be
 # entirely absent from PATH even in a plain root shell. If that's the case
 # here, find out where they actually live from the running pvedaemon unit.
 #
-# NOTE: this is a per-run workaround. The real fix is adding the
+# Note: this build of proxmox-ve doesn't ship a `pveversion` binary at all
+# (confirmed by listing its bin/ directory), so that's never used as the
+# signal here — qm is, since that's what this script actually needs to run.
+#
+# NOTE: this PATH fix is a per-run workaround. The real fix is adding the
 # proxmox-ve package to environment.systemPackages (or otherwise linking
 # it into the system profile) in your NixOS config, so it's on PATH
 # everywhere, not just inside this script.
-if ! command -v pveversion &>/dev/null; then
-  PVE_BIN_DIR=""
+PVE_BIN_DIR=""
+if ! command -v qm &>/dev/null; then
   if command -v systemctl &>/dev/null; then
     PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
     [[ -n "$PVE_EXEC" ]] && PVE_BIN_DIR=$(dirname "$PVE_EXEC")
@@ -59,6 +68,11 @@ if ! command -v pveversion &>/dev/null; then
     echo "Note: $PVE_BIN_DIR wasn't on PATH — added it for this run."
     echo "Consider adding the proxmox-ve package to environment.systemPackages so this is permanent."
   fi
+else
+  # qm was already reachable; still record where, so pve_check() below can
+  # read the version out of the store path name instead of calling
+  # pveversion (which doesn't exist in this build).
+  PVE_BIN_DIR=$(dirname "$(command -v qm)")
 fi
 
 # nix-shell replaces PATH with just its build environment rather than
@@ -116,7 +130,10 @@ fi
 
 # Proxmox's own tooling has to already be present — this script won't try to
 # install these, since they come from the Proxmox VE packaging itself.
-for cmd in qm pvesm pvesh pveversion; do
+# (pveversion is deliberately not checked here — some proxmox-nixos builds
+# don't ship it; pve_check() below falls back to reading the version out
+# of the Nix store path instead.)
+for cmd in qm pvesm pvesh; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "ERROR: '$cmd' not found. This doesn't look like a working Proxmox VE host." >&2
     echo "Current PATH: $PATH" >&2
@@ -279,7 +296,17 @@ function check_root() {
 # Supported: Proxmox VE 8.0.x – 8.9.x, 9.0 and 9.2
 pve_check() {
   local PVE_VER
-  PVE_VER="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+  if command -v pveversion &>/dev/null; then
+    PVE_VER="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+  else
+    # This build doesn't ship pveversion — pull the version straight out
+    # of the Nix store path name instead (e.g. proxmox-ve-9.2.10 -> 9.2.10).
+    PVE_VER="$(echo "$PVE_BIN_DIR" | grep -oP 'proxmox-ve-\K[0-9.]+' | head -n1)"
+    if [[ -z "$PVE_VER" ]]; then
+      msg_error "Could not determine Proxmox VE version (no pveversion, and couldn't parse it from $PVE_BIN_DIR)."
+      exit 105
+    fi
+  fi
 
   if [[ "$PVE_VER" =~ ^8\.([0-9]+) ]]; then
     local MINOR="${BASH_REMATCH[1]}"
@@ -320,7 +347,7 @@ function arch_check() {
 }
 
 function ssh_check() {
-  if command -v pveversion >/dev/null 2>&1; then
+  if command -v qm >/dev/null 2>&1; then
     if [ -n "${SSH_CLIENT:+x}" ]; then
       if whiptail --backtitle "Proxmox VE Helper Scripts" --defaultno --title "SSH DETECTED" --yesno "It's suggested to use the Proxmox shell instead of SSH, since SSH can create issues while gathering variables. Would you like to proceed with using SSH?" 10 62; then
         echo "you've been warned"
