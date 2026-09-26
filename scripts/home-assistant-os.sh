@@ -68,13 +68,24 @@ if ! command -v qm &>/dev/null; then
     echo "Note: $PVE_BIN_DIR wasn't on PATH — added it for this run."
     echo "Consider adding the proxmox-ve package to environment.systemPackages so this is permanent."
   fi
-else
-  # qm was already reachable; still record where, so pve_check() below can
-  # read the version out of the store path name instead of calling
-  # pveversion (which doesn't exist in this build). command -v may return
-  # a symlink (e.g. /run/current-system/sw/bin/qm) rather than the real
-  # store path, so resolve it fully first.
-  PVE_BIN_DIR=$(dirname "$(readlink -f "$(command -v qm)")")
+fi
+
+# Separately: figure out where the *release version* actually lives, for
+# pve_check() below. qm/pvesh/pvesm can each be symlinked in from
+# different, independently-versioned per-component derivations (e.g.
+# pve-ha-manager-5.2.5) rather than the main proxmox-ve meta-package that
+# encodes the actual PVE release (e.g. proxmox-ve-9.2.10) — so this must
+# NOT be inferred from wherever qm happens to resolve to. pvedaemon is
+# reliably part of that main meta-package, so use it specifically.
+PVE_VERSION_DIR=""
+if command -v systemctl &>/dev/null; then
+  PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
+  if [[ -n "$PVE_EXEC" ]]; then
+    PVE_VERSION_DIR=$(dirname "$(readlink -f "$PVE_EXEC")")
+  fi
+fi
+if [[ -z "$PVE_VERSION_DIR" ]]; then
+  PVE_VERSION_DIR=$(find /nix/store -maxdepth 1 -type d -name 'proxmox-ve-*' 2>/dev/null | sort -V | tail -n1)
 fi
 
 # nix-shell replaces PATH with just its build environment rather than
@@ -303,9 +314,9 @@ pve_check() {
   else
     # This build doesn't ship pveversion — pull the version straight out
     # of the Nix store path name instead (e.g. proxmox-ve-9.2.10 -> 9.2.10).
-    PVE_VER="$(echo "$PVE_BIN_DIR" | grep -oP 'proxmox-ve-\K[0-9.]+' | head -n1)"
+    PVE_VER="$(echo "$PVE_VERSION_DIR" | grep -oP 'proxmox-ve-\K[0-9.]+' | head -n1)"
     if [[ -z "$PVE_VER" ]]; then
-      msg_error "Could not determine Proxmox VE version (no pveversion, and couldn't parse it from $PVE_BIN_DIR)."
+      msg_error "Could not determine Proxmox VE version (no pveversion, and couldn't parse it from $PVE_VERSION_DIR)."
       exit 105
     fi
   fi
