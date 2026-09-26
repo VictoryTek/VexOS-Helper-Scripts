@@ -33,6 +33,34 @@
 #    something this script can paper over — it'll tell you which one.
 # ---------------------------------------------------------------------------
 
+# proxmox-nixos runs Proxmox VE's actual binaries straight out of the Nix
+# store (systemd units call them by full path) but doesn't necessarily
+# symlink that output into /run/current-system/sw/bin the way
+# environment.systemPackages normally would — so pveversion/qm/etc. can be
+# entirely absent from PATH even in a plain root shell. If that's the case
+# here, find out where they actually live from the running pvedaemon unit.
+#
+# NOTE: this is a per-run workaround. The real fix is adding the
+# proxmox-ve package to environment.systemPackages (or otherwise linking
+# it into the system profile) in your NixOS config, so it's on PATH
+# everywhere, not just inside this script.
+if ! command -v pveversion &>/dev/null; then
+  PVE_BIN_DIR=""
+  if command -v systemctl &>/dev/null; then
+    PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
+    [[ -n "$PVE_EXEC" ]] && PVE_BIN_DIR=$(dirname "$PVE_EXEC")
+  fi
+  if [[ -z "$PVE_BIN_DIR" ]]; then
+    PVE_BIN_DIR=$(find /nix/store -maxdepth 1 -type d -name 'proxmox-ve-*' 2>/dev/null | sort -V | tail -n1)
+    [[ -n "$PVE_BIN_DIR" ]] && PVE_BIN_DIR="$PVE_BIN_DIR/bin"
+  fi
+  if [[ -n "$PVE_BIN_DIR" && -d "$PVE_BIN_DIR" ]]; then
+    export PATH="$PATH:$PVE_BIN_DIR"
+    echo "Note: $PVE_BIN_DIR wasn't on PATH — added it for this run."
+    echo "Consider adding the proxmox-ve package to environment.systemPackages so this is permanent."
+  fi
+fi
+
 # nix-shell replaces PATH with just its build environment rather than
 # appending to the existing one, so Proxmox's own binaries (pveversion, qm,
 # etc. — not part of nixpkgs) would otherwise vanish once we re-exec into
@@ -69,8 +97,21 @@ if [[ -z "${NIX_SHELL_REEXEC:-}" ]]; then
       SELF_PATH=$(mktemp)
       curl -fsSL "$SCRIPT_URL" -o "$SELF_PATH"
     fi
-    exec nix-shell -p "${missing_pkgs[@]}" --run "NIX_SHELL_REEXEC=1 PATH=\"\$PATH:$ORIG_PATH\" bash '$SELF_PATH'"
+    # Pass ORIG_PATH through as a real environment variable (via `env`)
+    # rather than interpolating it into the --run string: nix-shell's
+    # --run just hands that string to a shell to parse, so anything odd
+    # in a directory name (quotes, $, etc.) could break the interpolated
+    # version silently. `env` sidesteps that entirely.
+    exec env NIX_SHELL_REEXEC=1 HAOS_ORIG_PATH="$ORIG_PATH" \
+      nix-shell -p "${missing_pkgs[@]}" --run "bash '$SELF_PATH'"
   fi
+fi
+
+# When re-entering after the nix-shell re-exec above, stitch the original
+# PATH (captured before nix-shell replaced it) back in, so Proxmox's own
+# binaries are reachable again.
+if [[ -n "${HAOS_ORIG_PATH:-}" ]]; then
+  export PATH="$PATH:$HAOS_ORIG_PATH"
 fi
 
 # Proxmox's own tooling has to already be present — this script won't try to
@@ -78,7 +119,9 @@ fi
 for cmd in qm pvesm pvesh pveversion; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "ERROR: '$cmd' not found. This doesn't look like a working Proxmox VE host." >&2
+    echo "Current PATH: $PATH" >&2
     echo "That's a proxmox-nixos setup issue, not something this script can fix." >&2
+    echo "Try running 'command -v $cmd' outside this script to confirm where it lives." >&2
     exit 1
   fi
 done
