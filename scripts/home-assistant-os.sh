@@ -91,7 +91,12 @@ else
   if command -v systemctl &>/dev/null; then
     PVE_EXEC=$(systemctl show -p ExecStart --value pvedaemon.service 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n1)
     if [[ -n "$PVE_EXEC" ]]; then
-      PVE_VERSION_DIR=$(dirname "$(readlink -f "$PVE_EXEC")")
+      # Deliberately NOT readlink -f'd here: the raw path systemd reports
+      # (.../proxmox-ve-9.2.10/bin/pvedaemon) already carries the release
+      # version in its name. Fully resolving it follows straight through
+      # to whichever per-component package (e.g. pve-manager-9.2.10)
+      # actually provides the binary, which strips that name out.
+      PVE_VERSION_DIR=$(dirname "$PVE_EXEC")
     fi
   fi
   if [[ -z "$PVE_VERSION_DIR" ]]; then
@@ -324,8 +329,11 @@ pve_check() {
     PVE_VER="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
   else
     # This build doesn't ship pveversion — pull the version straight out
-    # of the Nix store path name instead (e.g. proxmox-ve-9.2.10 -> 9.2.10).
-    PVE_VER="$(echo "$PVE_VERSION_DIR" | grep -oP 'proxmox-ve-\K[0-9.]+' | head -n1)"
+    # of the Nix store path name instead (e.g. proxmox-ve-9.2.10 -> 9.2.10,
+    # or pve-manager-9.2.10 -> 9.2.10 as a fallback pattern — note this is
+    # NOT true of every pve-* component, e.g. pve-ha-manager versions
+    # independently of the overall PVE release).
+    PVE_VER="$(echo "$PVE_VERSION_DIR" | grep -oP '(proxmox-ve|pve-manager)-\K[0-9.]+' | head -n1)"
     if [[ -z "$PVE_VER" ]]; then
       msg_error "Could not determine Proxmox VE version (no pveversion, and couldn't parse it from $PVE_VERSION_DIR)."
       exit 105
