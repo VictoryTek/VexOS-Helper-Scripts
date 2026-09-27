@@ -333,7 +333,10 @@ pve_check() {
     # or pve-manager-9.2.10 -> 9.2.10 as a fallback pattern — note this is
     # NOT true of every pve-* component, e.g. pve-ha-manager versions
     # independently of the overall PVE release).
-    PVE_VER="$(echo "$PVE_VERSION_DIR" | grep -oP '(proxmox-ve|pve-manager)-\K[0-9.]+' | head -n1)"
+    # Uses sed -E (POSIX extended regex) rather than grep -P/\K: some
+    # minimal grep builds aren't compiled with PCRE support, in which case
+    # -P fails silently (empty output) instead of erroring loudly.
+    PVE_VER="$(echo "$PVE_VERSION_DIR" | sed -n -E 's/.*(proxmox-ve|pve-manager)-([0-9]+\.[0-9]+(\.[0-9]+)?).*/\2/p' | head -n1)"
     if [[ -z "$PVE_VER" ]]; then
       msg_error "Could not determine Proxmox VE version (no pveversion, and couldn't parse it from $PVE_VERSION_DIR)."
       exit 105
