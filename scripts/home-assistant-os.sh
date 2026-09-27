@@ -806,8 +806,10 @@ msg_ok "Resized disk"
 DESCRIPTION=$(
   cat <<EOF
 <div align='center'>
-  <h2 style='font-size: 24px; margin: 20px 0;'>Homeassistant OS VM</h2>
-  <p>Created via a proxmox-nixos-adapted community-scripts helper.</p>
+  <h2 style='font-size: 24px; margin: 12px 0 4px 0;'>🏠 Home Assistant OS VM</h2>
+  <p style='margin: 4px 0;'>Built with <a href='https://github.com/VictoryTek/VexOS-Helper-Scripts' target='_blank' rel='noopener noreferrer'>VexOS Helper Scripts</a></p>
+  <p style='margin: 4px 0; font-size: 12px; color: #888;'>Adapted for proxmox-nixos from the community-scripts Proxmox VE Helper-Scripts project</p>
+  <p style='margin: 4px 0; font-size: 12px; color: #888;'>HAOS ${BRANCH} · Created $(date '+%Y-%m-%d')</p>
 </div>
 EOF
 )
