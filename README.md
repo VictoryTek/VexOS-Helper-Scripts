@@ -20,8 +20,7 @@
 | --- | --- | --- |
 | [🏠 Home Assistant OS VM](#-home-assistant-os-vm) | Proxmox VE (proxmox-nixos) | Create a Home Assistant OS virtual machine |
 | [🎬 Plex Migrate Backup](#-plex-migrate-backup) | Any systemd Linux | Snapshot Plex data into one portable `tar.gz` |
-| [💾 Backup Docker Stacks](#-backup-docker-stacks) | Any Linux with Docker | Back up every Dockge/docker-compose stack under a directory |
-| [♻️ Restore Docker Stacks](#-restore-docker-stacks) | Any Linux with Docker | Restore stacks archived by Backup Docker Stacks |
+| [💾 Backup & Restore Docker Stacks](#-backup--restore-docker-stacks) | Any Linux with Docker | Menu-driven backup/restore of Dockge/docker-compose stacks |
 
 ---
 
@@ -57,33 +56,27 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-
 
 ---
 
-### 💾 Backup Docker Stacks
+### 💾 Backup & Restore Docker Stacks
 
-Walks every stack under `STACKS_DIR` (e.g. a Dockge stacks folder) and, for each one: runs the app's own backup command if it's listed in `services.conf` (`method=builtin` — a Gitea dump, Paperless `document_exporter`, etc.), or otherwise auto-detects a Postgres/MySQL/Redis container and dumps it. It then stops the stack, archives the stack directory (compose file, `.env`, bind mounts, backup artifact/DB dump) into `BACKUP_DIR`, and restarts it. Optionally rsyncs the finished backup set to a remote host.
+One script, two modes, picked from a menu (or by passing `backup`/`restore` as an argument):
+
+- **Backup** — walks every stack under `STACKS_DIR` (e.g. a Dockge stacks folder) and, for each one: runs the app's own backup command if it's listed in `services.conf` (`method=builtin` — a Gitea dump, Paperless `document_exporter`, etc.), or otherwise auto-detects a Postgres/MySQL/Redis container and dumps it. It then stops the stack, archives the stack directory (compose file, `.env`, bind mounts, backup artifact/DB dump) into `BACKUP_DIR`, and restarts it. Optionally rsyncs the finished backup set to a remote host.
+- **Restore** — for each `.tar.gz` dropped next to the script: extracts it (stack folder plus any captured bind-mount paths, back to their original absolute locations), recreates any Docker networks the compose file marks `external: true`, then brings the stack back up — replaying the matching `services.conf` builtin restore command, or restoring the auto-detected DB dump, before starting the rest of the stack.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/backup-services.sh
+curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/backup-restore-services.sh
+chmod +x backup-restore-services.sh
+./backup-restore-services.sh          # interactive menu
+./backup-restore-services.sh backup   # or skip the menu
+./backup-restore-services.sh restore
 ```
 
 > [!NOTE]
-> This isn't a curl-pipe-to-shell script — edit `STACKS_DIR`, `BACKUP_DIR`, and (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` near the top of the file before running. Run as **root** (needs `docker compose down`/`up`). Produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR` — review both before wiping a host. See [Configuring services.conf](#configuring-servicesconf) below to customize per-stack behavior.
-
----
-
-### ♻️ Restore Docker Stacks
-
-Restores stacks previously archived by [Backup Docker Stacks](#-backup-docker-stacks). For each `.tar.gz` dropped next to the script: extracts it (stack folder plus any captured bind-mount paths, back to their original absolute locations), recreates any Docker networks the compose file marks `external: true`, then brings the stack back up — replaying the matching `services.conf` builtin restore command, or restoring the auto-detected DB dump, before starting the rest of the stack.
-
-```bash
-curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/restore-services.sh
-```
-
-> [!NOTE]
-> Place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run, then run it as **root**. Restored stacks land in a `stacks/` folder next to the script. Check `restore.log` afterward — any stack logged as needing manual follow-up should be reviewed by hand.
+> This isn't a curl-pipe-to-shell script — edit `STACKS_DIR`, `BACKUP_DIR`, and (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` near the top of the file before running backup. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`). Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
 
 #### Configuring services.conf
 
-Both scripts look for an optional `services.conf` next to them (the backup script copies its copy into `BACKUP_DIR` so it travels with the archives). Each non-comment, non-blank line describes one stack:
+Both modes look for an optional `services.conf` next to the script (backup copies its own copy into `BACKUP_DIR` so it travels with the archives). Each non-comment, non-blank line describes one stack:
 
 ```
 stack_name|container|method|backup_cmd|artifact_path|restore_cmd
