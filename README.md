@@ -64,15 +64,18 @@ One script, two modes, picked from a menu (or by passing `backup`/`restore` as a
 - **Restore** — for each `.tar.gz` dropped next to the script: extracts it (stack folder plus any captured bind-mount paths, back to their original absolute locations), recreates any Docker networks the compose file marks `external: true`, then brings the stack back up — replaying the matching `services.conf` builtin restore command, or restoring the auto-detected DB dump, before starting the rest of the stack.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/backup-restore-services.sh
-chmod +x backup-restore-services.sh
-sudo ./backup-restore-services.sh          # interactive menu
-sudo ./backup-restore-services.sh backup   # or skip the menu
+curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/backup-restore-services.sh && chmod +x backup-restore-services.sh && sudo ./backup-restore-services.sh
+```
+
+That downloads the script into the current folder, makes it executable, and runs it (interactive menu) — `sudo` will ask for your password. To skip the menu, or to run it again later:
+
+```bash
+sudo ./backup-restore-services.sh backup
 sudo ./backup-restore-services.sh restore
 ```
 
 > [!NOTE]
-> This isn't a curl-pipe-to-shell script — edit `STACKS_DIR`, `BACKUP_DIR`, and (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` near the top of the file before running backup. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`) — the script exits immediately if it isn't. Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
+> This isn't a curl-pipe-to-shell script — the one-liner above runs it with the defaults at the top of the file. If `STACKS_DIR`, `BACKUP_DIR`, or (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` need changing, run only the `curl … && chmod +x …` part, edit the file, then start it with `sudo ./backup-restore-services.sh`. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`) — the script exits immediately if it isn't. Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
 
 #### Configuring services.conf
 
