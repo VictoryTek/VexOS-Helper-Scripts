@@ -5,7 +5,7 @@
 **One-line installers and utilities for Proxmox, NixOS, and friends.**
 
 [![License](https://img.shields.io/github/license/VictoryTek/VexOS-Helper-Scripts?style=flat-square&color=blue)](LICENSE)
-[![Scripts](https://img.shields.io/badge/scripts-4-brightgreen?style=flat-square)](#scripts)
+[![Scripts](https://img.shields.io/badge/scripts-3-brightgreen?style=flat-square)](#scripts)
 [![Platform](https://img.shields.io/badge/platform-Proxmox%20%C2%B7%20NixOS%20%C2%B7%20Linux-lightgrey?style=flat-square)](#scripts)
 
 [Scripts](#scripts) · [Usage](#usage) · [Contributing](#contributing) · [License](#license)
