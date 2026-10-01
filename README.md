@@ -74,8 +74,13 @@ sudo ./backup-restore-services.sh backup
 sudo ./backup-restore-services.sh restore
 ```
 
+**Which folder to run it from** — the script uses its own location as its working area, so it matters for restore but not for backup:
+
+- **Backup:** any folder you can write to (Downloads, Documents, your home folder…). `STACKS_DIR` and `BACKUP_DIR` are absolute paths, so the current folder doesn't affect them. If you have a `services.conf`, put it in the same folder as the script first; backup copies it into `BACKUP_DIR`.
+- **Restore:** run it from the folder that holds the backup set. It picks up the `.tar.gz` archives and `services.conf` from its own folder, and writes the restored stacks to a `stacks/` subfolder and `restore.log` there — so that folder needs enough free space for the restored stacks.
+
 > [!NOTE]
-> This isn't a curl-pipe-to-shell script — the one-liner above runs it with the defaults at the top of the file. If `STACKS_DIR`, `BACKUP_DIR`, or (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` need changing, run only the `curl … && chmod +x …` part, edit the file, then start it with `sudo ./backup-restore-services.sh`. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`) — the script exits immediately if it isn't. Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
+> This isn't a curl-pipe-to-shell script — the one-liner above runs it with the defaults at the top of the file. If `STACKS_DIR`, `BACKUP_DIR`, or (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` need changing, run only the `curl … && chmod +x …` part, edit the file, then start it with `sudo ./backup-restore-services.sh`. Run either mode as **root** (needs `docker compose down`/`up`) — the script exits immediately if it isn't. Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
 
 #### Configuring services.conf
 
