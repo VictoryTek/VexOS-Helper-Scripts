@@ -66,13 +66,13 @@ One script, two modes, picked from a menu (or by passing `backup`/`restore` as a
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/backup-restore-services.sh
 chmod +x backup-restore-services.sh
-./backup-restore-services.sh          # interactive menu
-./backup-restore-services.sh backup   # or skip the menu
-./backup-restore-services.sh restore
+sudo ./backup-restore-services.sh          # interactive menu
+sudo ./backup-restore-services.sh backup   # or skip the menu
+sudo ./backup-restore-services.sh restore
 ```
 
 > [!NOTE]
-> This isn't a curl-pipe-to-shell script — edit `STACKS_DIR`, `BACKUP_DIR`, and (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` near the top of the file before running backup. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`). Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
+> This isn't a curl-pipe-to-shell script — edit `STACKS_DIR`, `BACKUP_DIR`, and (optionally) `REMOTE_HOST` / `REMOTE_PATH` / `DO_REMOTE_SYNC` near the top of the file before running backup. For restore, place this script in the same folder as the `.tar.gz` archives and the `services.conf` copied alongside them by the backup run — restored stacks land in a `stacks/` folder next to the script. Run either mode as **root** (needs `docker compose down`/`up`) — the script exits immediately if it isn't. Backup produces `manifest.csv` (per-stack status) and `backup.log` in `BACKUP_DIR`; restore produces `restore.log` next to the script — review the relevant log afterward, especially any stack flagged for manual follow-up.
 
 #### Configuring services.conf
 

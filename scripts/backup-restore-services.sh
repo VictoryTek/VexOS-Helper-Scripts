@@ -31,13 +31,19 @@
 #       then brings up the full stack
 #
 # Usage:
-#   ./backup-restore-services.sh            # interactive menu
-#   ./backup-restore-services.sh backup      # skip the menu
-#   ./backup-restore-services.sh restore     # skip the menu
+#   sudo ./backup-restore-services.sh            # interactive menu
+#   sudo ./backup-restore-services.sh backup      # skip the menu
+#   sudo ./backup-restore-services.sh restore     # skip the menu
 #
+# Must run as root (docker compose down/up, writing archives under BACKUP_DIR).
 # Configure the variables below before running.
 
 set -uo pipefail  # not using -e — one stack failing shouldn't kill the whole run
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must run as root (it stops/starts stacks and writes archives). Re-run with: sudo $0 ${*:-}" >&2
+  exit 1
+fi
 
 # Widen PATH to cover common docker install locations. A script run
 # non-interactively (even via sudo ./script.sh) doesn't source your
@@ -226,7 +232,9 @@ run_backup() {
   LOG_FILE="${BACKUP_DIR}/backup.log"
   SUMMARY_FILE="${BACKUP_DIR}/manifest.csv"
 
-  mkdir -p "$BACKUP_DIR"
+  # Abort before touching any stack — otherwise every stack would be stopped,
+  # fail to archive, and be restarted for nothing.
+  mkdir -p "$BACKUP_DIR" || { echo "Cannot create BACKUP_DIR (${BACKUP_DIR}) — aborting before any stack is touched." >&2; exit 1; }
   rotate_log "$LOG_FILE"
 
   : > "$SUMMARY_FILE"
@@ -495,7 +503,7 @@ run_builtin_restore() {
 run_restore() {
   LOG_FILE="${INCOMING_DIR}/restore.log"
 
-  mkdir -p "$RESTORE_DIR"
+  mkdir -p "$RESTORE_DIR" || { echo "Cannot create RESTORE_DIR (${RESTORE_DIR}) — aborting." >&2; exit 1; }
   rotate_log "$LOG_FILE"
 
   local total=0 ok=0 manual_followup=0

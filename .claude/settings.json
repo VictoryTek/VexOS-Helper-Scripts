@@ -1,0 +1,36 @@
+{
+  "effortLevel": "medium",
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(bash -n:*)",
+      "Bash(nix-shell -p shellcheck --run:*)"
+    ],
+    "deny": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(bash scripts/:*)",
+      "Bash(bash ./scripts/:*)",
+      "Bash(sh scripts/:*)",
+      "Bash(./scripts/:*)",
+      "Bash(sudo:*)",
+      "Bash(qm:*)",
+      "Bash(pvesm:*)",
+      "Bash(pvesh:*)",
+      "Bash(systemctl stop:*)",
+      "Bash(systemctl start:*)",
+      "Bash(systemctl restart:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker network create:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}
