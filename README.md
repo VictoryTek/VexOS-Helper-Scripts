@@ -5,7 +5,7 @@
 **One-line installers and utilities for Proxmox, NixOS, and friends.**
 
 [![License](https://img.shields.io/github/license/VictoryTek/VexOS-Helper-Scripts?style=flat-square&color=blue)](LICENSE)
-[![Scripts](https://img.shields.io/badge/scripts-3-brightgreen?style=flat-square)](#scripts)
+[![Scripts](https://img.shields.io/badge/scripts-4-brightgreen?style=flat-square)](#scripts)
 [![Platform](https://img.shields.io/badge/platform-Proxmox%20%C2%B7%20NixOS%20%C2%B7%20Linux-lightgrey?style=flat-square)](#scripts)
 
 [Scripts](#scripts) · [Usage](#usage) · [Contributing](#contributing) · [License](#license)
@@ -21,6 +21,7 @@
 | [🏠 Home Assistant OS VM](#-home-assistant-os-vm) | Proxmox VE (proxmox-nixos) | Create a Home Assistant OS virtual machine |
 | [🎬 Plex Migrate Backup](#-plex-migrate-backup) | Any systemd Linux | Snapshot Plex data into one portable `tar.gz` |
 | [💾 Backup & Restore Docker Stacks](#-backup--restore-docker-stacks) | Any Linux with Docker | Menu-driven backup/restore of Dockge/docker-compose stacks |
+| [🔀 Migrate Services to vexos](#-migrate-services-to-vexos) | vexos-nix server | Restore Docker Compose service backups into native vexos server modules |
 
 ---
 
@@ -93,6 +94,37 @@ stack_name|container|method|backup_cmd|artifact_path|restore_cmd
 - `method` is `builtin` (run the app's own backup/restore commands) or left blank for the generic Postgres/MySQL/Redis auto-detection.
 - `backup_cmd` / `restore_cmd` run inside `container` via `docker exec`; `artifact_path` is the in-container path copied out on backup and back in on restore.
 - A stack with no matching line (or no `services.conf` at all) falls back to the generic DB-detection path.
+
+---
+
+### 🔀 Migrate Services to vexos
+
+Takes a backup made by [Backup & Restore Docker Stacks](#-backup--restore-docker-stacks) (the zip, or a folder of `.tar.gz` files) and moves the services in it onto the matching `vexos.server.*` modules on a vexos-nix server. Only services **found in the backup** are touched. For each one it:
+
+1. enables the module in `/etc/nixos/server-services.nix`
+2. runs `just rebuild`
+3. stops the service, moves any existing data aside (`<dest>.pre-restore-<time>`), copies the backed-up data into the module's real data location, fixes ownership, and starts it again
+
+Supported: sonarr, radarr, lidarr, prowlarr, sabnzbd, bazarr, maintainerr, tautulli, code-server, wishlist, grimmory (including its database dump). qbittorrent, bookshelf and cloudflare-ddns are reported but not migrated. It never runs the backup script's restore mode or starts compose stacks.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/migrate-services.sh && chmod +x migrate-services.sh
+./migrate-services.sh vmc01-migration.zip            # dry run: changes nothing
+./migrate-services.sh --apply vmc01-migration.zip    # do it
+```
+
+| Option | Effect |
+| --- | --- |
+| `--apply` | Actually make changes (default is a dry run) |
+| `--only a,b,c` / `--skip a,b` | Limit to, or leave out, specific services |
+| `--skip-rebuild` | Don't run `just rebuild` |
+| `--force` | Redo a service already migrated by this script |
+| `--repo DIR` | Location of your vexos-nix checkout (the folder with the `justfile`) |
+| `--services-file F` | Default `/etc/nixos/server-services.nix` |
+| `--keep-staging` | Keep the extracted backup when finished |
+
+> [!NOTE]
+> Run as your **normal user** on the vexos server (it uses `sudo` where needed). Start with the dry run. code-server is only enabled once `vexos.server.code-server.hashedPassword` is set. After migrating, check the Arr apps' download clients and root folders and Tautulli's Plex address, since they still point at the old container setup.
 
 ---
 
