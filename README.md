@@ -109,8 +109,9 @@ Supported: sonarr, radarr, lidarr, prowlarr, sabnzbd, bazarr, maintainerr, tautu
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/VictoryTek/VexOS-Helper-Scripts/main/scripts/migrate-services.sh && chmod +x migrate-services.sh
-./migrate-services.sh vmc01-migration.zip            # dry run: changes nothing
-./migrate-services.sh --apply vmc01-migration.zip    # do it
+chmod +x migrate-services.sh
+./migrate-services.sh ~/Documents/vmc01-migration.zip           # look first
+./migrate-services.sh --apply ~/Documents/vmc01-migration.zip   # then go
 ```
 
 | Option | Effect |
